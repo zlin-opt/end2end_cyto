@@ -33,19 +33,20 @@ dof=zeros(Float64,Mz,Mx)
 
 Eyreal=zeros(Float64,Nx);
 Eyimag=zeros(Float64,Nx);
-grad=zeros(Float64,Nxz);
+egrad=zeros(Float64,Nxz);
 
 ipx=Int(Mx/2)
 ipz=Int(Mz/2)
 dp=0.01;
-nn=100;
+nn=10;
 
 for i=1:nn
 
-    dof[ipx,ipy] += dp
+    dof[ipz,ipx] += dp
     eps = deepcopy(epsbkg)
-    eps[Npmlz0+gap+1:Npmlz0+gap+1+Mz,Npmlx0+1:Npmlx0+1+Mx] += dof * epsdiff
-    eps = vec(eps) #I assumed last-index-fastest flattening; change the index order if that's not true to match with the C code
+
+    eps[Npmlz0+gap+1:Npmlz0+gap+Mz,Npmlx0+1:Npmlx0+Mx] += dof * epsdiff
+    eps = vec(eps) #I assumed last-index-fastest flattening; change the index order, if that's not true, to match with the C code
     
     ccall((:forward,"/u/zinlin/cytometer/lib/lib2d"),Cvoid, (Ptr{ops_}, Ptr{Float64},Ptr{Float64},Ptr{Float64}), ptrops,eps,Eyreal,Eyimag)
     obj=sum(Eyreal.^2 + Eyimag.^2)
@@ -53,9 +54,9 @@ for i=1:nn
     gimag=2.0*Eyimag
     ccall((:adjoint,"/u/zinlin/cytometer/lib/lib2d"),Cvoid, (Ptr{ops_}, Ptr{Float64},Ptr{Float64},Ptr{Float64}), ptrops,greal,gimag,egrad)
 
-    grad = epsdiff * reshape(egrad, (Nz,Nx))[Npmlz0+gap+1:Npmlz0+gap+1+Mz,Npmlx0+1:Npmlx0+1+Mx] #Again I assumed last-index-fastest reshaping; change the index order otherwise
+    grad = epsdiff * reshape(egrad, (Nz,Nx))[Npmlz0+gap+1:Npmlz0+gap+Mz,Npmlx0+1:Npmlx0+Mx] #Again I assumed last-index-fastest reshaping; change the index order otherwise
     if MPI.Comm_rank(comm)==0
-       println("obj: $(eps[ip]) $obj $(grad[ipx,ipy])")
+       println("obj: $(dof[ipz,ipx]) $obj $(grad[ipz,ipx])")
     end
 end
 
